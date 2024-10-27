@@ -130,6 +130,9 @@ MouseCurrentSpeed = %MouseSpeed%
 MouseWheelCurrentAccelerationSpeed = 0
 MouseWheelCurrentSpeed = %MouseSpeed%
 
+x_grid_num = %XGridNum%
+y_grid_num = %YGridNum%
+
 SetKeyDelay, -1
 SetMouseDelay, -1
 
@@ -500,8 +503,6 @@ ButtonGridLongPressStart:
 	Sysget, win_width, 78
 	Sysget, win_height , 79
 	; MsgBox, %win_height%, %win_width%
-	x_grid_num = 18
-	y_grid_num = 6
 	x_grid_size := win_width/x_grid_num
 	y_grid_size := win_height/y_grid_num
 	; MsgBox, %x_grid_size%, %y_grid_size%
@@ -996,6 +997,10 @@ MouseWheelMaxSpeed = 5
 
 [MouseRotationAngle]
 MouseRotationAngle = 0
+
+[GridNum]
+XGridNum = 18
+YGridNum = 6
 )
   FileAppend, %ini%, %ApplicationName%.ini
 ;   ini=
@@ -1014,6 +1019,8 @@ IniRead, MouseWheelAccelerationSpeed, %ApplicationName%.ini, MouseWheel, MouseWh
 IniRead, MouseWheelMaxSpeed, %ApplicationName%.ini, MouseWheel, MouseWheelMaxSpeed
 
 IniRead, MouseRotationAngle, %ApplicationName%.ini, MouseRotationAngle, MouseRotationAngle
+IniRead, XGridNum, %ApplicationName%.ini, GridNum, XGridNum
+IniRead, YGridNum, %ApplicationName%.ini, GridNum, YGridNum
 return
 
 TRAYMENU:
