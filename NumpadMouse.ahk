@@ -1,4 +1,4 @@
-﻿; Using Keyboard Numpad as a Mouse -- by deguix
+; Using Keyboard Numpad as a Mouse -- by deguix
 ; http://www.autohotkey.com
 ; This script makes mousing with your keyboard almost as easy
 ; as using a real mouse (maybe even easier for some tasks).
@@ -38,6 +38,12 @@ o-------------------------------------------------------------------------------
 | /PgUp                 |                                                                |
 |                       |                                                                |
 |-----------------------|----------------------------------------------------------------|
+| ctrl+                 |                                                                |
+| NumpadEnd/Down/PgDn/  | Mouse movement on lattice.                                     |
+| /Left/Right/Home/Up/  |                                                                |
+| /PgUp                 |                                                                |
+|                       |                                                                |
+|-----------------------|----------------------------------------------------------------|
 | NumLock (toggled on)  | Activates mouse speed adj. mode.                               |
 |-----------------------|----------------------------------------------------------------|
 | Numpad7/Numpad1       | Inc./dec. acceleration per button press.                       |
@@ -73,10 +79,16 @@ o------------------------------------------------------------o
 |                       | cursor within active window area.  |
 |                       | Optimized saving of parameters     |
 o------------------------------------------------------------o
+| 2.01 by e-zz 		    | Added support for:				 |
+|						|	 lattice movement 				 |
+| 						|    arrow combo key                 |
+| 						|	 mouse leaping    				 |
+o------------------------------------------------------------o
+| 2.02 by e-zz 		    | Fix DPI problem for monitors		 |
+o------------------------------------------------------------o
 */
 
 ;START OF CONFIG SECTION
-
 #SingleInstance force
 #MaxHotkeysPerInterval 500
 
@@ -99,6 +111,12 @@ Gosub, TRAYMENU       ; Jumps to the specified label and continues execution unt
 
 Temp = 0
 Temp2 = 0
+
+RestoreDPI:=DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr") ; enable per-monitor DPI awareness and save current value to restore it when done - thanks to lexikos for this
+
+SetWorkingDir, %A_ScriptDir% ; Ensures a consistent starting directory: the directory containing the script.
+
+; MsgBox, The current working directory is: %A_WorkingDir%, while the script directory is: %A_ScriptDir%.
 
 MouseRotationAnglePart = %MouseRotationAngle%
 ;Divide by 45ş because MouseMove only supports whole numbers and changing the mouse rotation to a number lesser than 45ş
@@ -126,6 +144,8 @@ Hotkey, *NumpadMult, ButtonX2Click
 
 Hotkey, *NumpadSub, ButtonWheelUp
 Hotkey, *NumpadAdd, ButtonWheelDown
+Hotkey, #NumpadSub, ButtonWheelLeft
+Hotkey, #NumpadAdd, ButtonWheelRight
 
 Hotkey, *NumpadUp, ButtonUp
 Hotkey, *NumpadDown, ButtonDown
@@ -135,6 +155,15 @@ Hotkey, *NumpadHome, ButtonUpLeft
 Hotkey, *NumpadEnd, ButtonUpRight
 Hotkey, *NumpadPgUp, ButtonDownLeft
 Hotkey, *NumpadPgDn, ButtonDownRight
+
+Hotkey, ^NumpadUp, ButtonUpGrid
+Hotkey, ^NumpadDown, ButtonDownGrid
+Hotkey, ^NumpadLeft, ButtonLeftGrid
+Hotkey, ^NumpadRight, ButtonRightGrid
+Hotkey, ^NumpadHome, ButtonUpLeftGrid
+Hotkey, ^NumpadEnd, ButtonUpRightGrid
+Hotkey, ^NumpadPgUp, ButtonDownLeftGrid
+Hotkey, ^NumpadPgDn, ButtonDownRightGrid
 
 Hotkey, Numpad8, ButtonSpeedUp
 Hotkey, Numpad2, ButtonSpeedDown
@@ -158,13 +187,23 @@ return
 
 ;Key activation support
 
+~^NumpadDiv:: reload
+return 
+
+~^+NumpadDiv:: exitapp 
+return 
+
+~^NumpadMult:: 
+MouseClick WheelRight,,, 6, 0
+return 
+; WheelRight
 ~ScrollLock::
 ; Wait for it to be released because otherwise the hook state gets reset
 ; while the key is down, which causes the up-event to get suppressed,
 ; which in turn prevents toggling of the ScrollLock state/light:
 KeyWait, ScrollLock
 GetKeyState, ScrollLockState, ScrollLock, T
-If ScrollLockState = D
+If ScrollLockState 
 {
 	ToolTip, NumPadMouse activated
 	SetTimer, RemoveToolTip, 1000
@@ -263,7 +302,7 @@ if (NumLockState)
 }
 else
 {
-	ToolTip, NumPadMouse configuration mode DEACTIVATED, configuration SAVED
+	ToolTip, NumPadMouse configuration mode DEACTIVATED and configuration SAVED
 	SetTimer, RemoveToolTip, 1000
 	IniWrite, %MouseSpeed%, %ApplicationName%.ini, MouseSpeed, MouseSpeed
 	IniWrite, %MouseAccelerationSpeed%, %ApplicationName%.ini, MouseSpeed, MouseAccelerationSpeed
@@ -275,6 +314,7 @@ else
 
 	IniWrite, %MouseRotationAngle%, %ApplicationName%.ini, MouseRotationAngle, MouseRotationAngle
 }	
+return
 
 ;Mouse click support
 
@@ -337,14 +377,10 @@ If already_down_state = D
 	return
 Button2 = NumpadMult
 ButtonClick = X2
-Goto ButtonClickStart
+Goto MouseLeap
 
 ButtonClickStart: 
-WinGetActiveStats, Title, Width, Height, X, Y
-;~ MouseClick, %ButtonClick%,,, 1, 0, D
-CoordMode, Mouse, Window
-MouseMove, Width/2, Height/2, 0
-;~ MsgBox, % "X: " . X " Y: " . Y " Width: " . Width " Height: " . Height " Pos x: " . X + Width/2 " Pos y: " Y + Height/2
+MouseClick, %ButtonClick%,,, 1, 0, D
 SetTimer, ButtonClickEnd, 10
 return
 
@@ -352,18 +388,28 @@ ButtonClickEnd:
 GetKeyState, kclickstate, %Button2%, P
 if kclickstate = D
 	return
-
+; key released, so turn off repeated timer
 SetTimer, ButtonClickEnd, Off
-;~ MouseClick, %ButtonClick%,,, 1, 0, U
+MouseClick, %ButtonClick%,,, 1, 0, U
+; now release the mouse button  
 return
 
+MouseLeap:
+WinGetActiveStats, Title, Width, Height, X, Y
+; MouseMove, X + Width/2, Y + Height/2,0 ; not working well on multi-monitors
+DllCall("SetCursorPos", "int",  X + Width/2, "int", Y + Height/2)
+ToolTip, % "X: " . X " Y: " . Y " Width: " . Width " Height: " . Height " Pos x: " . X + Width/2 " Pos y: " Y + Height/2
+SetTimer, RemoveToolTip, 1000
+return
+
+; Done leap on a lattice?
 ;Mouse movement support
 
 ButtonSpeedUp:
 	MouseSpeed++
 	ToolTip, Mouse speed: %MouseSpeed% pixels
 	SetTimer, RemoveToolTip, 1000
-	;~ IniWrite, %MouseSpeed%, %ApplicationName%.ini, MouseSpeed, MouseSpeed
+	IniWrite, %MouseSpeed%, %ApplicationName%.ini, MouseSpeed, MouseSpeed
 return
 ButtonSpeedDown:
 	if (MouseSpeed > 1) {
@@ -432,6 +478,94 @@ ButtonRotationAngleDown:
 	SetTimer, RemoveToolTip, 1000
 return
 
+
+
+ButtonUpGrid:
+ButtonDownGrid:
+ButtonLeftGrid:
+ButtonRightGrid:
+ButtonUpLeftGrid:
+ButtonUpRightGrid:
+ButtonDownLeftGrid:
+ButtonDownRightGrid:
+
+StringReplace, Button, A_ThisHotkey, ^ ; trim "*" char in A_ThisHotkey. E.g., *NumpadUp → NumpadUp
+ButtonGridLongPressStart:
+{
+	; TODO add rotation support
+	; TODO add acceleration support
+	; TODO add combo support
+
+	; Get monitor size, assign to win_width and win_height 
+	Sysget, win_width, 78
+	Sysget, win_height , 79
+	; MsgBox, %win_height%, %win_width%
+	x_grid_num = 18
+	y_grid_num = 6
+	x_grid_size := win_width/x_grid_num
+	y_grid_size := win_height/y_grid_num
+	; MsgBox, %x_grid_size%, %y_grid_size%
+	If (Button = "NumpadUp") {
+		MouseMove, 0, -y_grid_size,20, R
+	} Else If (Button = "NumpadDown") {
+		MouseMove, 0, y_grid_size, 20, R
+	} Else If (Button = "NumpadLeft") {
+		MouseMove, -x_grid_size, 0, 20, R
+	} Else If (Button = "NumpadRight") {
+		MouseMove, x_grid_size, 0, 20, R
+	} Else If (Button = "NumpadHome") {
+		MouseMove, -x_grid_size, -y_grid_size, 20, R
+	} Else If (Button = "NumpadEnd") {
+		MouseMove, -x_grid_size, y_grid_size, 20, R
+	} Else If (Button = "NumpadPgUp") {
+		MouseMove, x_grid_size, -y_grid_size, 20, R
+	} Else If (Button = "NumpadPgDn") {
+		MouseMove, x_grid_size, y_grid_size, 20, R
+	}
+	SetTimer, ButtonGridLongPressEnd, 200
+	return
+}
+
+ButtonGridLongPressEnd:
+; acc ends check on comboButton
+; GetKeyState, kstate, %Button%, P
+
+released := true	; true when all keys are released after comboButton is released
+one_only := false  ; true when only one key is released after comboButton is released
+; if (comboButton != "") {
+
+;     for index, key in combinations[comboButton] {
+;         if (GetKeyState(key, "P")) {
+;             released := false
+; 			one_only := !one_only
+;         }
+;     }
+
+; 	if (one_only) {
+; 		for index, key in combinations[comboButton] {
+; 			if (GetKeyState(key, "P")) {
+; 				button := key
+; 				break
+; 			}
+; 		}
+;     }
+
+
+; } else {
+	GetKeyState, kstate, %Button%, P
+	released := (kstate != "D")
+; }
+
+if (!released) {
+	Goto ButtonGridLongPressStart
+}
+SetTimer, ButtonGridLongPressEnd, Off
+; MouseCurrentAccelerationSpeed = 0
+; MouseCurrentSpeed = %MouseSpeed%
+Button = 0
+return
+
+
 ButtonUp:
 ButtonDown:
 ButtonLeft:
@@ -440,17 +574,56 @@ ButtonUpLeft:
 ButtonUpRight:
 ButtonDownLeft:
 ButtonDownRight:
-If Button <> 0
-{
-	IfNotInString, A_ThisHotkey, %Button% ; Checks if a variable contains the specified string. Var: A_ThisHotkey. SearchString: %Button%
-	{
-		MouseCurrentAccelerationSpeed = 0
-		MouseCurrentSpeed = %MouseSpeed%
-	}
-}
-StringReplace, Button, A_ThisHotkey, * ; Replaces the specified substring with a new string. OutputVar = Button, The name of the variable in which to store the result of the replacement process. InputVar = A_ThisHotkey, The name of the variable whose contents will be read from. SearchText = * The string to search for.
+
+
+StringReplace, Button, A_ThisHotkey, * ; trim "*" char in A_ThisHotkey. E.g., *NumpadUp → NumpadUp
 
 ButtonAccelerationStart:
+comboButton := ""
+
+If Button <> 0
+{
+	combinations := Object()
+	combinations["NumpadHome"] := ["NumpadUp", "NumpadLeft"]
+	combinations["NumpadEnd"] := ["NumpadDown", "NumpadLeft"]
+	combinations["NumpadPgUp"] := ["NumpadUp", "NumpadRight"]
+	combinations["NumpadPgDn"] := ["NumpadDown", "NumpadRight"]
+    ; Check if two other arrow keys are still being pressed
+	; arrowKeys := ["NumpadUp", "NumpadDown", "NumpadLeft", "NumpadRight"]
+	; reset := true
+    ; for each, key in arrowKeys
+    ; {
+	; 	; msgbox, Button: %Button% key: %key%
+    ;     if (key != Button and GetKeyState(key, "P")) {
+    ;         ; Code to execute if the key is being pressed
+	; 		reset := false
+	; 	
+    ;     }
+    ; }
+	; if (reset){
+	; 	MouseCurrentAccelerationSpeed = 0
+	; 	MouseCurrentSpeed = 0
+	; }
+	
+	; Check if combination of arrow keys is pressed, e.g. Numpad8 and Numpad4 = Numpad7
+	; In total, there are 4 combinations, check all of them
+	
+	for combination, keys in combinations
+	{
+		
+		if (GetKeyState(keys[1], "P") and GetKeyState(keys[2], "P")) {
+			; Button = %combination%
+			comboButton := combination
+			; MsgBox, %comboButton%, %MouseSpeed%, %MouseCurrentSpeed%
+			break
+		}
+	}
+}
+; if (comboButton != "") {
+	
+; msgbox, comboButton: %comboButton%
+; }
+
 If MouseAccelerationSpeed >= 1
 {
 	If MouseMaxSpeed > %MouseCurrentSpeed%
@@ -468,44 +641,18 @@ If MouseAccelerationSpeed >= 1
 	MouseCurrentSpeedToDirection /= 90.0
 	Temp = %MouseCurrentSpeedToDirection%
 
-	if Temp >= 0
-	{
-		if Temp < 1
-		{
-			MouseCurrentSpeedToDirection = 1
-			MouseCurrentSpeedToDirection -= %Temp%
-			Goto EndMouseCurrentSpeedToDirectionCalculation
-		}
-	}
-	if Temp >= 1
-	{
-		if Temp < 2
-		{
-			MouseCurrentSpeedToDirection = 0
-			Temp -= 1
-			MouseCurrentSpeedToDirection -= %Temp%
-			Goto EndMouseCurrentSpeedToDirectionCalculation
-		}
-	}
-	if Temp >= 2
-	{
-		if Temp < 3
-		{
-			MouseCurrentSpeedToDirection = -1
-			Temp -= 2
-			MouseCurrentSpeedToDirection += %Temp%
-			Goto EndMouseCurrentSpeedToDirectionCalculation
-		}
-	}
-	if Temp >= 3
-	{
-		if Temp < 4
-		{
-			MouseCurrentSpeedToDirection = 0
-			Temp -= 3
-			MouseCurrentSpeedToDirection += %Temp%
-			Goto EndMouseCurrentSpeedToDirectionCalculation
-		}
+	if (Temp >= 0 && Temp < 1) {
+		MouseCurrentSpeedToDirection = 1
+	 	MouseCurrentSpeedToDirection -= Temp
+	} else if (Temp >= 1 && Temp < 2) {
+		MouseCurrentSpeedToDirection = 0
+	 	MouseCurrentSpeedToDirection -= Temp - Floor(Temp)
+	} else if (Temp >= 2 && Temp < 3) {
+		MouseCurrentSpeedToDirection = -1
+	 	MouseCurrentSpeedToDirection += Temp - Floor(Temp)
+	} else if (Temp >= 3 && Temp < 4) {
+		MouseCurrentSpeedToDirection = 0
+	 	MouseCurrentSpeedToDirection += Temp - Floor(Temp)
 	}
 }
 EndMouseCurrentSpeedToDirectionCalculation:
@@ -517,100 +664,96 @@ EndMouseCurrentSpeedToDirectionCalculation:
 	Temp = %MouseCurrentSpeedToSide%
 	Transform, Temp, mod, %Temp%, 4
 
-	if Temp >= 0
-	{
-		if Temp < 1
-		{
-			MouseCurrentSpeedToSide = 0
-			MouseCurrentSpeedToSide += %Temp%
-			Goto EndMouseCurrentSpeedToSideCalculation
-		}
-	}
-	if Temp >= 1
-	{
-		if Temp < 2
-		{
-			MouseCurrentSpeedToSide = 1
-			Temp -= 1
-			MouseCurrentSpeedToSide -= %Temp%
-			Goto EndMouseCurrentSpeedToSideCalculation
-		}
-	}
-	if Temp >= 2
-	{
-		if Temp < 3
-		{
-			MouseCurrentSpeedToSide = 0
-			Temp -= 2
-			MouseCurrentSpeedToSide -= %Temp%
-			Goto EndMouseCurrentSpeedToSideCalculation
-		}
-	}
-	if Temp >= 3
-	{
-		if Temp < 4
-		{
-			MouseCurrentSpeedToSide = -1
-			Temp -= 3
-			MouseCurrentSpeedToSide += %Temp%
-			Goto EndMouseCurrentSpeedToSideCalculation
-		}
+	if (Temp >= 0 && Temp < 1) {
+		MouseCurrentSpeedToSide = Temp
+	} else if (Temp >= 1 && Temp < 2) {
+		MouseCurrentSpeedToSide = 1
+		MouseCurrentSpeedToSide -= (Temp - 1)
+	} else if (Temp >= 2 && Temp < 3) {
+		MouseCurrentSpeedToSide = 0
+		MouseCurrentSpeedToSide -= (Temp - 2)
+	} else if (Temp >= 3 && Temp < 4) {
+		MouseCurrentSpeedToSide = -1
+		MouseCurrentSpeedToSide += (Temp - 3)
 	}
 }
 EndMouseCurrentSpeedToSideCalculation:
 
+; MsgBox, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, %MouseCurrentSpeed% 
+
 MouseCurrentSpeedToDirection *= %MouseCurrentSpeed%
 MouseCurrentSpeedToSide *= %MouseCurrentSpeed%
+
 
 Temp = %MouseRotationAnglePart%
 Transform, Temp, Mod, %Temp%, 2
 
-If Button = NumpadUp
-{
-	if Temp = 1
+; if (Button != "") {
+; 	 MsgBox, Button: %Button%
+; }
+if (comboButton = "") {
+	If Button = NumpadUp
 	{
-		MouseCurrentSpeedToSide *= 2
-		MouseCurrentSpeedToDirection *= 2
-	}
+		if Temp = 1
+		{
+			MouseCurrentSpeedToSide *= 2
+			MouseCurrentSpeedToDirection *= 2
+		}
 
-	MouseCurrentSpeedToDirection *= -1
-	MouseMove, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
-}
-else if Button = NumpadDown
-{
-	if Temp = 1
+		MouseCurrentSpeedToDirection *= -1
+		MouseMove, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
+		; MsgBox, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
+	}
+	else if Button = NumpadDown
 	{
-		MouseCurrentSpeedToSide *= 2
-		MouseCurrentSpeedToDirection *= 2
-	}
+		if Temp = 1
+		{
+			MouseCurrentSpeedToSide *= 2
+			MouseCurrentSpeedToDirection *= 2
+		}
 
-	MouseCurrentSpeedToSide *= -1
-	MouseMove, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
-}
-else if Button = NumpadLeft
-{
-	if Temp = 1
+		MouseCurrentSpeedToSide *= -1
+		MouseMove, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
+		; MsgBox, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
+	}
+	else if Button = NumpadLeft
 	{
-		MouseCurrentSpeedToSide *= 2
-		MouseCurrentSpeedToDirection *= 2
+		if Temp = 1
+		{
+			MouseCurrentSpeedToSide *= 2
+			MouseCurrentSpeedToDirection *= 2
+		}
+
+		MouseCurrentSpeedToSide *= -1
+		MouseCurrentSpeedToDirection *= -1
+
+		MouseMove, %MouseCurrentSpeedToDirection%, %MouseCurrentSpeedToSide%, 0, R
+		; MsgBox, %MouseCurrentSpeedToSide%, %MouseCurrentSpeedToDirection%, 0, R
 	}
-
-	MouseCurrentSpeedToSide *= -1
-	MouseCurrentSpeedToDirection *= -1
-
-	MouseMove, %MouseCurrentSpeedToDirection%, %MouseCurrentSpeedToSide%, 0, R
-}
-else if Button = NumpadRight
-{
-	if Temp = 1
+	else if Button = NumpadRight
 	{
-		MouseCurrentSpeedToSide *= 2
-		MouseCurrentSpeedToDirection *= 2
-	}
+		if Temp = 1
+		{
+			MouseCurrentSpeedToSide *= 2
+			MouseCurrentSpeedToDirection *= 2
+		}
 
-	MouseMove, %MouseCurrentSpeedToDirection%, %MouseCurrentSpeedToSide%, 0, R
+		MouseMove, %MouseCurrentSpeedToDirection%, %MouseCurrentSpeedToSide%, 0, R
+	; CoordMode, Mouse, Screen
+	; MouseGetPos, X, Y
+	; ; X += MouseCurrentSpeedToDirection*100
+	; ; Y += MouseCurrentSpeedToSide*10
+	; 	DllCall("SetCursorPos", "int", X, "int", Y)
+		; MsgBox, %X%, %Y%
+	}
 }
-else if Button = NumpadHome
+
+
+	; if (comboButton != ""){
+	; 	msgbox, comboButton: %comboButton%
+	; }
+
+if (Button = "NumpadHome" or comboButton = "NumpadHome")
 {
 	Temp = %MouseCurrentSpeedToDirection%
 	Temp -= %MouseCurrentSpeedToSide%
@@ -620,16 +763,7 @@ else if Button = NumpadHome
 	Temp2 *= -1
 	MouseMove, %Temp%, %Temp2%, 0, R
 }
-else if Button = NumpadPgUp
-{
-	Temp = %MouseCurrentSpeedToDirection%
-	Temp += %MouseCurrentSpeedToSide%
-	Temp2 = %MouseCurrentSpeedToDirection%
-	Temp2 -= %MouseCurrentSpeedToSide%
-	Temp2 *= -1
-	MouseMove, %Temp%, %Temp2%, 0, R
-}
-else if Button = NumpadEnd
+else if (Button = "NumpadEnd" or comboButton = "NumpadEnd")
 {
 	Temp = %MouseCurrentSpeedToDirection%
 	Temp += %MouseCurrentSpeedToSide%
@@ -638,7 +772,16 @@ else if Button = NumpadEnd
 	Temp2 -= %MouseCurrentSpeedToSide%
 	MouseMove, %Temp%, %Temp2%, 0, R
 }
-else if Button = NumpadPgDn
+else if (Button = "NumpadPgUp" or comboButton = "NumpadPgUp")
+{
+	Temp = %MouseCurrentSpeedToDirection%
+	Temp += %MouseCurrentSpeedToSide%
+	Temp2 = %MouseCurrentSpeedToDirection%
+	Temp2 -= %MouseCurrentSpeedToSide%
+	Temp2 *= -1
+	MouseMove, %Temp%, %Temp2%, 0, R
+}
+else if (Button = "NumpadPgDn" or comboButton = "NumpadPgDn")
 {
 	Temp = %MouseCurrentSpeedToDirection%
 	Temp -= %MouseCurrentSpeedToSide%
@@ -652,10 +795,36 @@ SetTimer, ButtonAccelerationEnd, 10
 return
 
 ButtonAccelerationEnd:
-GetKeyState, kstate, %Button%, P
-if kstate = D
-	Goto ButtonAccelerationStart
+; acc ends check on comboButton
+; GetKeyState, kstate, %Button%, P
 
+released := true	; true when all keys are released after comboButton is released
+one_only := false  ; true when only one key is released after comboButton is released
+if (comboButton != "") {
+
+    for index, key in combinations[comboButton] {
+        if (GetKeyState(key, "P")) {
+            released := false
+			one_only := !one_only
+        }
+    }
+
+	if (one_only) {
+		for index, key in combinations[comboButton] {
+			if (GetKeyState(key, "P")) {
+				button := key
+				break
+			}
+		}
+    }
+} else {
+	GetKeyState, kstate, %Button%, P
+	released := (kstate != "D")
+}
+
+if (!released) {
+	Goto ButtonAccelerationStart
+}
 SetTimer, ButtonAccelerationEnd, Off
 MouseCurrentAccelerationSpeed = 0
 MouseCurrentSpeed = %MouseSpeed%
@@ -747,7 +916,8 @@ return
 
 ButtonWheelUp:
 ButtonWheelDown:
-
+ButtonWheelLeft:
+ButtonWheelRight:
 If Button <> 0
 {
 	If Button <> %A_ThisHotkey%
@@ -771,11 +941,25 @@ If MouseWheelAccelerationSpeed >= 1
 }
 
 If Button = NumpadSub
+{
 	MouseClick, WheelUp,,, %MouseWheelCurrentSpeed%, 0, D
+	SetTimer, ButtonWheelAccelerationEnd, 100
+}
 else if Button = NumpadAdd
+{
 	MouseClick, WheelDown,,, %MouseWheelCurrentSpeed%, 0, D
+	SetTimer, ButtonWheelAccelerationEnd, 100
+}
+else if Button = #NumpadSub
+		; MouseClick, WheelLeft,,, %MouseWheelCurrentSpeed%, 0, D ; not always working 
+	Loop 2 {
+		Send, {WheelLeft}
+	}
+else if Button = #NumpadAdd
+	Loop 2 {
+		Send, {WheelRight}
+	}
 
-SetTimer, ButtonWheelAccelerationEnd, 100
 return
 
 ButtonWheelAccelerationEnd:
@@ -801,22 +985,23 @@ INIREAD:
   ini=
 (
 [MouseSpeed]
-MouseSpeed = 1
-MouseAccelerationSpeed = 1
-MouseMaxSpeed = 5
+MouseSpeed = 2
+MouseAccelerationSpeed = 24
+MouseMaxSpeed = 64
 
 [MouseWheel]
-MouseWheelSpeed = 1
-MouseWheelAccelerationSpeed = 1
+MouseWheelSpeed = 2
+MouseWheelAccelerationSpeed = 3
 MouseWheelMaxSpeed = 5
 
 [MouseRotationAngle]
 MouseRotationAngle = 0
 )
   FileAppend, %ini%, %ApplicationName%.ini
-  ini=
-}
+;   ini=
+; MsgBox , %A_WorkingDir% %ApplicationName%.ini not exist. Set mouse speed to  %MouseSpeed% 
 
+}
 IniRead, MouseSpeed, %ApplicationName%.ini, MouseSpeed, MouseSpeed
 IniRead, MouseAccelerationSpeed, %ApplicationName%.ini, MouseSpeed, MouseAccelerationSpeed
 IniRead, MouseMaxSpeed, %ApplicationName%.ini, MouseSpeed, MouseMaxSpeed
