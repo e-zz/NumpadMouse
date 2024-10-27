@@ -7,7 +7,7 @@ This script is based on [a previous work by deguix and mslonik](https://github.c
 The mouse emulation is achieved by using the following keys:
 - WheelLeft and WheelRight
 - Combo arrow keys: for example, by pressing either `NumpadHome` or `up + left`, the cursor will move in the up-left direction.
-- Mouse Leap: move cursor to the center of the windows being focused
+- Mouse Leap: move cursor to the center of the windows being focused. (Hope it makes the life easier for people like me who use multiple monitors.)
 - Lattice move: move cursor between grid points. The grid size is customizable.
 
 This script is an example of using AutoHotkey to remap numpad keys to emulate mouse functions. Key features include acceleration (increasing mouse movement speed when holding a key) and rotation (changing the direction of movement). Below is a list of keys and their functions:
