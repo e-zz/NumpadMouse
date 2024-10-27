@@ -40,6 +40,7 @@ In mouse movement mode (NumLock off), with the modifier key `!` (Alt) pressed, t
 
 
 4. Clicks
+Keys for mouse wheel and buttons. Specially, `#` (Shift) can be used to move the mouse wheel horizontally.
 
 | Keys                  | Description                                                    |
 |-----------------------|----------------------------------------------------------------|
@@ -48,6 +49,7 @@ In mouse movement mode (NumLock off), with the modifier key `!` (Alt) pressed, t
 | NumpadDot             | Right mouse button click.                                      |
 | NumpadDiv/NumpadMult  | X1/X2 mouse button click. (Win 2k+)                            |
 | NumpadSub/NumpadAdd   | Moves up/down the mouse wheel.                                 |
+| #NumpadSub/#NumpadAdd | Moves left/right the mouse wheel.                              |
 
 
 
